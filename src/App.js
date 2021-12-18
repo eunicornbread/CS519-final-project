@@ -1,6 +1,8 @@
 import './App.css';
 import jsonData from './data.json';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import 'antd/dist/antd.css';
+import { Input, Slider } from 'antd';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -24,42 +26,11 @@ ChartJS.register(
 );
 
 
-const options = {
-  animation: {
-    easing: 'linear'
-  },
-  
-  responsive: true,
-  plugins: {
-    legend: {
-      position: 'top',
-    },
-    title: {
-      display: true,
-      text: 'Chart.js Line Chart',
-    },
-  },
-  scales: {
-    // x: {
-    //   type: 'time',
-    //   time: {
-    //     parser: 'YYYY-MM-DD',
-    //     unit: 'day',
-    //     displayFormats: {
-    //       'day': 'MM/DD/YYYY'
-    //     },
-  
-    //   }
-    // },
-    y: {
-      reverse: true,
-      min: 1,
-      max: 100,
-    }
-  }
-};
-
-
+const { Search } = Input;
+const MAX_LENGTH = 10;
+const DEFAULT_ARTIST = "katy perry";
+const DEFAULT_START = 2015;
+const DEFAULT_END = 2021;
 
 const borderColors = [
   'rgb(255, 99, 132)',
@@ -82,24 +53,23 @@ const backgroundColors = [
 ];
 
 
-
-
-
-
-
 export default function App() {
-  const maxLength = 10;
-  
   const chart = useRef(null);
-  const tempData = jsonData.slice(0, 2000).reverse()
+  const intervalRef = useRef(null);
+  const [artist, setArtist] = useState(DEFAULT_ARTIST);
+  const [start, setStart] = useState(DEFAULT_START)
+  const [end, setEnd] = useState(DEFAULT_END);
+
+  const selectedData = jsonData.filter(data => {
+    const year = parseInt(data['date'].substring(0, 4), 10)
+    return year >= start && year <= end;
+  }).reverse()
   
 
   const filteredData = [];
-  // const artist = 'olivia rodrigo'
-  const artist = 'doja cat'
   const songsByArtist = new Set()
 
-  tempData.forEach(temp => {
+  selectedData.forEach(temp => {
     if (temp['artist'].toUpperCase().includes(artist.toUpperCase())) {
       songsByArtist.add(temp['song'])
       filteredData.push(temp)
@@ -107,14 +77,6 @@ export default function App() {
   })
 
   
-
-
-
-
-
-
-
-
 
   const tempMap = filteredData.reduce((acc, curValue) => {
     if (!(curValue['date'] in acc)) {
@@ -142,7 +104,7 @@ export default function App() {
 
     return {
       label: song,
-      data: songData.slice(0, maxLength),
+      data: songData.slice(0, MAX_LENGTH),
       borderColor: borderColors[index % borderColors.length],
       backgroundColor: backgroundColors[index % backgroundColors.length],
       tension: 0.3,
@@ -152,23 +114,57 @@ export default function App() {
   
   const data = {
     datasets,
-    labels: allDate.slice(0, maxLength)
+    labels: allDate.slice(0, MAX_LENGTH)
   }
+
+  const options = {
+    animation: {
+      easing: 'linear'
+    },
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'top',
+      },
+      title: {
+        display: true,
+        text: `Songs by ${artist} from ${start} to ${end}`,
+      },
+    },
+    scales: {
+      // x: {
+      //   type: 'time',
+      //   time: {
+      //     parser: 'YYYY-MM-DD',
+      //     unit: 'day',
+      //     displayFormats: {
+      //       'day': 'MM/DD/YYYY'
+      //     },
+    
+      //   }
+      // },
+      y: {
+        reverse: true,
+        min: 1,
+        max: 100,
+      }
+    }
+  };
+  
 
   
   
   
   
-  const intervalRef = useRef(null);
   useEffect(() => {
-    if (allDate.length > maxLength) {
+    if (allDate.length > MAX_LENGTH) {
       const interval = setInterval(() => {
         data['labels'].shift();
-        data['labels'].push(allDate[maxLength + 1]);
+        data['labels'].push(allDate[MAX_LENGTH + 1]);
         allDate.shift();
         data.datasets.forEach(element => {
           element.data.shift();
-          element.data.push(allSongData[element.label][maxLength + 1])
+          element.data.push(allSongData[element.label][MAX_LENGTH + 1])
           allSongData[element.label].shift();
         })
 
@@ -176,7 +172,7 @@ export default function App() {
         chart.current.update();
         
   
-        if (allDate.length <= maxLength) {
+        if (allDate.length <= MAX_LENGTH) {
           clearInterval(intervalRef.current)
         }
   
@@ -186,10 +182,49 @@ export default function App() {
       return () => clearInterval(interval);
     }
     
-  }, []);
-
-  
+  }, [artist, start, end]);
 
 
-  return <div className="wrapper"><Line options={options} data={data} ref={chart} /></div>;
+
+
+  return (
+    <div className="container">
+      <div className='title'>Billboard Hot 100 Songs by Artist</div>
+      
+      <div className="inputs">
+        <div className='input'>
+          <div className="label">Artist: </div>
+          <Search 
+            placeholder="Search an artist" 
+            defaultValue={DEFAULT_ARTIST}
+            style={{ width: 300 }}
+            onSearch={newValue => {
+              if (newValue === "") {
+                return;
+              }
+              setArtist(newValue)
+          }} />
+        </div>
+        <div className='input'>
+          <div className="label">Years: </div>
+          <div className="slider">
+            <Slider 
+              range 
+              defaultValue={[DEFAULT_START, DEFAULT_END]} 
+              min={2000} 
+              max={2021} 
+              marks={{2000: '2000', 2021: '2021'}}
+              onAfterChange={newValue => {
+                setStart(newValue[0])
+                setEnd(newValue[1])
+              }}
+            />
+          </div>
+        </div>
+      </div>
+      <div className='chart'>
+        <Line options={options} data={data} ref={chart} />
+      </div>
+    </div>
+  );
 }
